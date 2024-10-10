@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        h1 {
+            background-color: #075E54;
+            color: white;
+            padding: 15px;
+            margin: 0;
+            text-align: center;
+        }
+
+        #chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            background-color: #e5ddd5;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 70%;
+            word-wrap: break-word;
+            line-height: 1.5;
+        }
+
+        .message.user {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+        }
+
+        .message.client {
+            background-color: #ffffff;
+            align-self: flex-start;
+        }
+
+        #message-container {
+            display: flex;
+            padding: 10px;
+            background-color: white;
+        }
+
+        #message {
+            flex: 1;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 10px;
+            margin-right: 10px;
+            outline: none;
+        }
+
+        #send {
+            background-color: #25D366;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        #send:hover {
+            background-color: #128C7E;
+        }
+
+        #typing-indicator {
+            font-style: italic;
+            color: #888;
+            display: none;
+        }
+
+        .timestamp {
+            font-size: 0.8em;
+            color: #999;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Welcome to the Chat Room, {{ username }}!</h1>
+    <div id="chat">
+        {% for message in messages %}
+            <div class="message {{ 'user' if message.username == username else 'client' }}">
+                <strong>{{ message.username }}:</strong> {{ message.message }}
+                <div class="timestamp">{{ message.timestamp }}</div>
+            </div>
+        {% endfor %}
+    </div>
+    <div id="typing-indicator"></div>
+    <div id="message-container">
+        <input type="text" id="message" placeholder="Type your message here..." />
+        <button id="send">Send</button>
+    </div>
+    
+    <script>
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // Listen for receiving messages
+        socket.on('receive_message', function(data) {
+            const chat = document.getElementById('chat');
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', data.username === '{{ username }}' ? 'user' : 'client');
+            messageDiv.innerHTML = `<strong>${data.username}:</strong> ${data.message} <div class="timestamp">${data.timestamp}</div>`;
+            chat.appendChild(messageDiv);
+            chat.scrollTop = chat.scrollHeight; // Auto scroll to the bottom
+        });
+
+        // Listen for typing indicator
+        socket.on('user_typing', function(data) {
+            const typingIndicator = document.getElementById('typing-indicator');
+            typingIndicator.innerText = `${data.username} is typing...`;
+            typingIndicator.style.display = 'block';
+            setTimeout(() => {
+                typingIndicator.style.display = 'none';
+            }, 2000); // Hide after 2 seconds
+        });
+
+        // Function to send message
+        function sendMessage() {
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value;
+
+            if (message.trim() !== '') {
+                socket.emit('send_message', {'message': message, 'room': 'general'}); // Adjust room as necessary
+
+                messageInput.value = ''; // Clear input
+            }
+        }
+
+        document.getElementById('send').onclick = sendMessage;
+
+        // Emit typing event
+        document.getElementById('message').addEventListener('input', function() {
+            socket.emit('typing');
+        });
+
+        // Send message on Enter key press
+        document.getElementById('message').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
